@@ -147,7 +147,7 @@ function calcSurface(s){
     var q = pi2(s.qty) || 1;
     var price = 0;
     if(s.type === "door_face") price = (s.doorSides === "both" ? 100 : 50) * q;
-    else if(s.type === "door_frame") price = 200 * q;
+    else if(s.type === "door_frame") price = (s.doorSides === "both" ? 200 : 100) * q;
     else if(s.type === "window_frame") price = 125 * q;
     return {sqft:0, lf:0, gal:0, pg:0, tg:0, price:price};
   }
@@ -241,7 +241,7 @@ function calcJobFixed(job){
       var s = items[i];
       var q = pi2(s.qty) || 1;
       if(s.type === "door_face"){ df.q += q; df.p += (s.doorSides === "both" ? 100 : 50) * q; }
-      else if(s.type === "door_frame"){ dr.q += q; dr.p += 200 * q; }
+      else if(s.type === "door_frame"){ dr.q += q; dr.p += (s.doorSides === "both" ? 200 : 100) * q; }
       else if(s.type === "window_frame"){ wi.q += q; wi.p += 125 * q; }
     }
   }
@@ -422,13 +422,18 @@ function renderSurfCard(surf, types, isExtra){
       fr.appendChild(toggleBtn("Both $100", surf.doorSides === "both", function(){ surf.doorSides = "both"; saveState(); render(); }));
       fr.appendChild(toggleBtn("One $50", surf.doorSides === "one", function(){ surf.doorSides = "one"; saveState(); render(); }));
     }
+    if(surf.type === "door_frame"){
+      fr.appendChild(el("div", "width:1px;height:20px;background:#3a3a3a;margin:0 4px;"));
+      fr.appendChild(toggleBtn("Both $200", surf.doorSides === "both", function(){ surf.doorSides = "both"; saveState(); render(); }));
+      fr.appendChild(toggleBtn("One $100", surf.doorSides === "one", function(){ surf.doorSides = "one"; saveState(); render(); }));
+    }
     wrapper.appendChild(fr);
 
     var bott = el("div", "margin-top:10px;padding-top:8px;border-top:1px solid #3a3a3a;display:flex;justify-content:space-between;font-size:11px;");
     var desc = surf.type === "door_face"
       ? (surf.qty || 1) + "× " + (surf.doorSides === "both" ? "$100" : "$50")
       : surf.type === "door_frame"
-      ? (surf.qty || 1) + "× $200"
+      ? (surf.qty || 1) + "× " + (surf.doorSides === "both" ? "$200" : "$100")
       : (surf.qty || 1) + "× $125";
     bott.appendChild(span(desc, "#8a8580"));
     bott.appendChild(span("$" + sr.price, "#d4a843", "font-weight:600;"));
