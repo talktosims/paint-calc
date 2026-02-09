@@ -492,6 +492,225 @@ function renderSurfCard(surf, types, isExtra){
   return wrapper;
 }
 
+/* ── Export CSV ── */
+function exportCSV(job, rate, er){
+  var rows = [];
+  rows.push(["Job Name", job.name]);
+  rows.push([]);
+  rows.push(["Room", "Surface", "Type", "Qty", "Sq Ft", "Linear Ft", "Primer Gal", "Topcoat Gal", "Price"]);
+
+  var jobTotals = {sqft:0, lf:0, pg:0, tg:0, price:0};
+
+  for(var i = 0; i < job.rooms.length; i++){
+    var rm = job.rooms[i];
+    var rp = calcRoomPrice(rm, rate, er);
+
+    if(rm.mode === "quick"){
+      var q = calcQuickRoom(rm);
+      // Walls
+      if(q.paintableWall > 0){
+        rows.push([rm.name, "Walls", "wall", 1, q.paintableWall.toFixed(1), "", c1(q.primerGal), c1(q.topGal), rp.sfLabor.toFixed(2)]);
+      }
+      // Ceiling
+      if(q.ceil > 0){
+        rows.push([rm.name, "Ceiling", "ceiling", 1, q.ceil.toFixed(1), "", "", "", ""]);
+      }
+      // Baseboard
+      if(q.bbFt > 0){
+        rows.push([rm.name, "Baseboard", "baseboard", 1, "", q.bbFt.toFixed(1), c1(q.bbPG), c1(q.bbTG), (q.bbFt * er).toFixed(2)]);
+      }
+      // Extras
+      var extras = rm.extras || [];
+      for(var j = 0; j < extras.length; j++){
+        var ex = extras[j];
+        var sr = calcSurface(ex);
+        var info = findType(ex.type);
+        var label = ex.label || (info ? info.l : ex.type);
+        var qty = pi2(ex.qty) || 1;
+        rows.push([rm.name, label, ex.type, qty,
+          sr.sqft > 0 ? sr.sqft.toFixed(1) : "",
+          sr.lf > 0 ? sr.lf.toFixed(1) : "",
+          sr.pg > 0 ? c1(sr.pg) : "",
+          sr.tg > 0 ? c1(sr.tg) : "",
+          sr.price > 0 ? sr.price.toFixed(2) : (sr.lf > 0 ? (sr.lf * er).toFixed(2) : "")
+        ]);
+      }
+    } else {
+      for(var j = 0; j < rm.surfaces.length; j++){
+        var surf = rm.surfaces[j];
+        var sr = calcSurface(surf);
+        var info = findType(surf.type);
+        var label = surf.label || (info ? info.l : surf.type);
+        var qty = pi2(surf.qty) || 1;
+        rows.push([rm.name, label, surf.type, qty,
+          sr.sqft > 0 ? sr.sqft.toFixed(1) : "",
+          sr.lf > 0 ? sr.lf.toFixed(1) : "",
+          sr.pg > 0 ? c1(sr.pg) : "",
+          sr.tg > 0 ? c1(sr.tg) : "",
+          sr.price > 0 ? sr.price.toFixed(2) : ""
+        ]);
+      }
+    }
+
+    // Room subtotal
+    rows.push(["", "", "ROOM TOTAL", "", rp.billable.toFixed(1), rp.lf.toFixed(1), c1(rp.pg), c1(rp.tg), "$" + rp.total.toFixed(2)]);
+    rows.push([]);
+
+    jobTotals.sqft += rp.billable;
+    jobTotals.lf += rp.lf;
+    jobTotals.pg += rp.pg;
+    jobTotals.tg += rp.tg;
+    jobTotals.price += rp.total;
+  }
+
+  // Job total
+  var hasOvr = job.priceOverride != null && job.priceOverride !== "";
+  var finalPrice = hasOvr ? pf(job.priceOverride) : jobTotals.price;
+  rows.push(["", "", "JOB TOTAL", "", jobTotals.sqft.toFixed(1), jobTotals.lf.toFixed(1), c1(jobTotals.pg), c1(jobTotals.tg), "$" + finalPrice.toFixed(2)]);
+  rows.push([]);
+  rows.push(["Rate $/sf/coat", rate]);
+  rows.push(["Enamel $/lf", er]);
+  if(hasOvr) rows.push(["Price Override", "$" + pf(job.priceOverride).toFixed(2)]);
+
+  // Build CSV string
+  var csv = rows.map(function(r){
+    return r.map(function(cell){
+      var s = String(cell === undefined || cell === null ? "" : cell);
+      if(s.indexOf(",") >= 0 || s.indexOf('"') >= 0 || s.indexOf("\n") >= 0){
+        return '"' + s.replace(/"/g, '""') + '"';
+      }
+      return s;
+    }).join(",");
+  }).join("\n");
+
+  var blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = (job.name || "paint-calc").replace(/[^a-zA-Z0-9_-]/g, "_") + ".csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ── Print Invoice ── */
+function printInvoice(job, rate, er){
+  var rps = job.rooms.map(function(rm){ return calcRoomPrice(rm, rate, er); });
+  var fb = calcJobFixed(job);
+  var sfTotal = 0, enTotal = 0, fxTotal = 0;
+  for(var i = 0; i < rps.length; i++){
+    sfTotal += rps[i].sfLabor; enTotal += rps[i].enLabor; fxTotal += rps[i].fixed;
+  }
+  var autoTotal = sfTotal + enTotal + fxTotal;
+  var hasOvr = job.priceOverride != null && job.priceOverride !== "";
+  var finalPrice = hasOvr ? pf(job.priceOverride) : autoTotal;
+
+  var h = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice - ' + (job.name || "Paint Calc") + '</title>';
+  h += '<style>';
+  h += 'body{font-family:Arial,Helvetica,sans-serif;color:#222;margin:0;padding:24px 32px;font-size:13px;}';
+  h += 'h1{font-size:22px;margin:0 0 4px;color:#333;}';
+  h += 'h2{font-size:15px;margin:20px 0 8px;color:#555;border-bottom:2px solid #ddd;padding-bottom:4px;}';
+  h += 'table{width:100%;border-collapse:collapse;margin-bottom:16px;}';
+  h += 'th{background:#f5f5f5;text-align:left;padding:6px 10px;font-size:11px;color:#555;border-bottom:2px solid #ccc;text-transform:uppercase;letter-spacing:.5px;}';
+  h += 'td{padding:5px 10px;border-bottom:1px solid #eee;font-size:12px;}';
+  h += 'tr.room-total td{font-weight:700;border-top:2px solid #ccc;border-bottom:none;background:#fafafa;}';
+  h += 'tr.job-total td{font-weight:700;font-size:14px;border-top:3px solid #333;background:#f0f0f0;}';
+  h += '.invoice-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;padding-bottom:16px;border-bottom:3px solid #333;}';
+  h += '.date{color:#888;font-size:12px;}';
+  h += '.totals-box{background:#f8f8f8;border:2px solid #333;border-radius:6px;padding:16px 20px;margin-top:20px;max-width:320px;margin-left:auto;}';
+  h += '.totals-row{display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px;color:#555;}';
+  h += '.totals-final{display:flex;justify-content:space-between;font-size:18px;font-weight:700;color:#222;border-top:2px solid #333;padding-top:8px;margin-top:8px;}';
+  h += '.rates{font-size:10px;color:#999;margin-top:16px;}';
+  h += '@media print{body{padding:16px;} @page{margin:0.5in;}}';
+  h += '</style></head><body>';
+
+  // Header
+  h += '<div class="invoice-header">';
+  h += '<div><h1>' + (job.name || "Paint Estimate") + '</h1>';
+  h += '<div class="date">Date: ' + new Date().toLocaleDateString("en-US", {year:"numeric",month:"long",day:"numeric"}) + '</div></div>';
+  h += '<div style="text-align:right;"><strong style="font-size:16px;color:#b8922e;">PAINT CALC</strong><br><span style="font-size:10px;color:#888;letter-spacing:2px;">ESTIMATOR</span></div>';
+  h += '</div>';
+
+  // Room tables
+  for(i = 0; i < job.rooms.length; i++){
+    var rm = job.rooms[i];
+    var rp = rps[i];
+    h += '<h2>' + rm.name + '</h2>';
+    h += '<table><thead><tr><th>Surface</th><th>Type</th><th>Qty</th><th>Sq Ft</th><th>Linear Ft</th><th>Primer (gal)</th><th>Topcoat (gal)</th><th style="text-align:right;">Price</th></tr></thead><tbody>';
+
+    if(rm.mode === "quick"){
+      var q = calcQuickRoom(rm);
+      if(q.paintableWall > 0){
+        h += '<tr><td>Walls</td><td>Wall</td><td>1</td><td>' + q.paintableWall.toFixed(1) + '</td><td>—</td><td>' + c1(q.primerGal) + '</td><td>' + c1(q.topGal) + '</td><td style="text-align:right;">—</td></tr>';
+      }
+      if(q.ceil > 0){
+        h += '<tr><td>Ceiling</td><td>Ceiling</td><td>1</td><td>' + q.ceil.toFixed(1) + '</td><td>—</td><td>—</td><td>—</td><td style="text-align:right;">—</td></tr>';
+      }
+      if(q.bbFt > 0){
+        h += '<tr><td>Baseboard</td><td>Baseboard</td><td>1</td><td>—</td><td>' + q.bbFt.toFixed(1) + '</td><td>' + c1(q.bbPG) + '</td><td>' + c1(q.bbTG) + '</td><td style="text-align:right;">$' + (q.bbFt * er).toFixed(0) + '</td></tr>';
+      }
+      var extras = rm.extras || [];
+      for(var j = 0; j < extras.length; j++){
+        var ex = extras[j];
+        var sr = calcSurface(ex);
+        var info = findType(ex.type);
+        var label = ex.label || (info ? info.l : ex.type);
+        var qty = pi2(ex.qty) || 1;
+        h += '<tr><td>' + label + '</td><td>' + (info ? info.l : ex.type) + '</td><td>' + qty + '</td>';
+        h += '<td>' + (sr.sqft > 0 ? sr.sqft.toFixed(1) : '—') + '</td>';
+        h += '<td>' + (sr.lf > 0 ? sr.lf.toFixed(1) : '—') + '</td>';
+        h += '<td>' + (sr.pg > 0 ? c1(sr.pg) : '—') + '</td>';
+        h += '<td>' + (sr.tg > 0 ? c1(sr.tg) : '—') + '</td>';
+        h += '<td style="text-align:right;">' + (sr.price > 0 ? '$' + sr.price.toFixed(0) : (sr.lf > 0 ? '$' + (sr.lf * er).toFixed(0) : '—')) + '</td></tr>';
+      }
+    } else {
+      for(var j = 0; j < rm.surfaces.length; j++){
+        var surf = rm.surfaces[j];
+        var sr = calcSurface(surf);
+        var info = findType(surf.type);
+        var label = surf.label || (info ? info.l : surf.type);
+        var qty = pi2(surf.qty) || 1;
+        h += '<tr><td>' + label + '</td><td>' + (info ? info.l : surf.type) + '</td><td>' + qty + '</td>';
+        h += '<td>' + (sr.sqft > 0 ? sr.sqft.toFixed(1) : '—') + '</td>';
+        h += '<td>' + (sr.lf > 0 ? sr.lf.toFixed(1) : '—') + '</td>';
+        h += '<td>' + (sr.pg > 0 ? c1(sr.pg) : '—') + '</td>';
+        h += '<td>' + (sr.tg > 0 ? c1(sr.tg) : '—') + '</td>';
+        h += '<td style="text-align:right;">' + (sr.price > 0 ? '$' + sr.price.toFixed(0) : '—') + '</td></tr>';
+      }
+    }
+
+    // Room subtotal
+    h += '<tr class="room-total"><td colspan="3">Room Total</td>';
+    h += '<td>' + rp.billable.toFixed(0) + ' sf</td>';
+    h += '<td>' + rp.lf.toFixed(0) + ' lf</td>';
+    h += '<td>' + c1(rp.pg) + '</td><td>' + c1(rp.tg) + '</td>';
+    h += '<td style="text-align:right;">$' + rp.total.toFixed(0) + '</td></tr>';
+    h += '</tbody></table>';
+  }
+
+  // Totals box
+  h += '<div class="totals-box">';
+  h += '<div class="totals-row"><span>Walls / Ceiling labor</span><span>$' + sfTotal.toFixed(0) + '</span></div>';
+  if(enTotal > 0) h += '<div class="totals-row"><span>Enamel / Trim labor</span><span>$' + enTotal.toFixed(0) + '</span></div>';
+  if(fb.df.q > 0) h += '<div class="totals-row"><span>Door faces (' + fb.df.q + ')</span><span>$' + fb.df.p + '</span></div>';
+  if(fb.dr.q > 0) h += '<div class="totals-row"><span>Door frames (' + fb.dr.q + ')</span><span>$' + fb.dr.p + '</span></div>';
+  if(fb.wi.q > 0) h += '<div class="totals-row"><span>Windows (' + fb.wi.q + ')</span><span>$' + fb.wi.p + '</span></div>';
+  if(hasOvr) h += '<div class="totals-row"><span>Auto-calc total</span><span style="text-decoration:line-through;">$' + autoTotal.toFixed(0) + '</span></div>';
+  h += '<div class="totals-final"><span>TOTAL</span><span>$' + finalPrice.toFixed(0) + '</span></div>';
+  h += '</div>';
+
+  h += '<div class="rates">Rate: $' + rate + '/sf/coat · Enamel: $' + er + '/lf · Coverage: ' + COV.sqft + 'sf/g top, ' + COV.primerSqft + 'sf/g primer, ' + COV.linear + 'lf/g trim</div>';
+  h += '</body></html>';
+
+  var w = window.open("", "_blank");
+  if(w){
+    w.document.write(h);
+    w.document.close();
+    setTimeout(function(){ w.print(); }, 400);
+  }
+}
+
 /* ── Main Render ── */
 function render(){
   var app = document.getElementById("app");
@@ -643,6 +862,12 @@ function render(){
       var rm = makeRoom({name: "Room " + (job.rooms.length + 1)});
       job.rooms.push(rm); job.activeRoomId = rm.id; STATE.view = "edit"; saveState(); render();
     }, "background:#b8922e;color:#1a1a1a;border:none;border-radius:4px;padding:8px 0;cursor:pointer;font-size:11px;font-weight:600;letter-spacing:.5px;width:100%;margin-top:8px;"));
+
+    /* Export buttons */
+    var expRow = flexRow([], 8, "margin-top:16px;padding-top:12px;border-top:1px solid #3a3a3a;");
+    expRow.appendChild(btn("Export CSV", function(){ exportCSV(job, rate, er); }, "flex:1;background:#2e2e2e;border:1px solid #3a3a3a;border-radius:4px;color:#5a9e6f;font-size:11px;padding:8px 0;cursor:pointer;font-weight:600;"));
+    expRow.appendChild(btn("Print Invoice", function(){ printInvoice(job, rate, er); }, "flex:1;background:#2e2e2e;border:1px solid #3a3a3a;border-radius:4px;color:#5588bb;font-size:11px;padding:8px 0;cursor:pointer;font-weight:600;"));
+    body.appendChild(expRow);
 
   } else {
     /* ── Room Editor ── */
