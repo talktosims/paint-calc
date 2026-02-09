@@ -81,7 +81,7 @@ function makeJob(o){
   var j = {
     id:uid(), name:"New Job", rooms:[makeRoom()],
     activeRoomId:null, pricePerSqftPerCoat:1,
-    enamelRate:ENAMEL_RATE, priceOverride:""
+    enamelRate:ENAMEL_RATE, priceOverride:"", materialsCost:""
   };
   if(o) for(var k in o) j[k] = o[k];
   return j;
@@ -565,12 +565,16 @@ function exportCSV(job, rate, er){
 
   // Job total
   var hasOvr = job.priceOverride != null && job.priceOverride !== "";
-  var finalPrice = hasOvr ? pf(job.priceOverride) : jobTotals.price;
+  var matCost = pf(job.materialsCost);
+  var hasMat = job.materialsCost != null && job.materialsCost !== "";
+  var finalPrice = (hasOvr ? pf(job.priceOverride) : jobTotals.price) - matCost;
   rows.push(["", "", "JOB TOTAL", "", jobTotals.sqft.toFixed(1), jobTotals.lf.toFixed(1), c1(jobTotals.pg), c1(jobTotals.tg), "$" + finalPrice.toFixed(2)]);
+  if(hasMat) rows.push(["", "", "Materials Deducted", "", "", "", "", "", "-$" + matCost.toFixed(2)]);
   rows.push([]);
   rows.push(["Rate $/sf/coat", rate]);
   rows.push(["Enamel $/lf", er]);
   if(hasOvr) rows.push(["Price Override", "$" + pf(job.priceOverride).toFixed(2)]);
+  if(hasMat) rows.push(["Materials Cost", "$" + matCost.toFixed(2)]);
 
   // Build CSV string
   var csv = rows.map(function(r){
@@ -604,7 +608,9 @@ function printInvoice(job, rate, er){
   }
   var autoTotal = sfTotal + enTotal + fxTotal;
   var hasOvr = job.priceOverride != null && job.priceOverride !== "";
-  var finalPrice = hasOvr ? pf(job.priceOverride) : autoTotal;
+  var matCost = pf(job.materialsCost);
+  var hasMat = job.materialsCost != null && job.materialsCost !== "";
+  var finalPrice = (hasOvr ? pf(job.priceOverride) : autoTotal) - matCost;
 
   var h = '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Invoice - ' + (job.name || "Paint Calc") + '</title>';
   h += '<style>';
@@ -697,6 +703,7 @@ function printInvoice(job, rate, er){
   if(fb.dr.q > 0) h += '<div class="totals-row"><span>Door frames (' + fb.dr.q + ')</span><span>$' + fb.dr.p + '</span></div>';
   if(fb.wi.q > 0) h += '<div class="totals-row"><span>Windows (' + fb.wi.q + ')</span><span>$' + fb.wi.p + '</span></div>';
   if(hasOvr) h += '<div class="totals-row"><span>Auto-calc total</span><span style="text-decoration:line-through;">$' + autoTotal.toFixed(0) + '</span></div>';
+  if(hasMat) h += '<div class="totals-row"><span>Materials (deducted)</span><span style="color:#c00;">−$' + matCost.toFixed(0) + '</span></div>';
   h += '<div class="totals-final"><span>TOTAL</span><span>$' + finalPrice.toFixed(0) + '</span></div>';
   h += '</div>';
 
@@ -786,7 +793,9 @@ function render(){
   for(i = 0; i < rps.length; i++){ sfTotal += rps[i].sfLabor; enTotal += rps[i].enLabor; fxTotal += rps[i].fixed; }
   var autoTotal = sfTotal + enTotal + fxTotal;
   var hasOvr = job.priceOverride != null && job.priceOverride !== "";
-  var totalPrice = hasOvr ? pf(job.priceOverride) : autoTotal;
+  var matCost = pf(job.materialsCost);
+  var hasMat = job.materialsCost != null && job.materialsCost !== "";
+  var totalPrice = (hasOvr ? pf(job.priceOverride) : autoTotal) - matCost;
   var fb = calcJobFixed(job);
 
   var tc = card([]);
@@ -809,6 +818,7 @@ function render(){
   if(fb.df.q > 0) breakdown.appendChild(row("Door faces (" + fb.df.q + ")", "$" + fb.df.p));
   if(fb.dr.q > 0) breakdown.appendChild(row("Door frames (" + fb.dr.q + ")", "$" + fb.dr.p));
   if(fb.wi.q > 0) breakdown.appendChild(row("Windows (" + fb.wi.q + ")", "$" + fb.wi.p));
+  if(hasMat) breakdown.appendChild(row("Materials (deducted)", "−$" + matCost.toFixed(0)));
   if(!hasOvr) breakdown.appendChild(span("AUTO", "#5a9e6f"));
   priceSec.appendChild(breakdown);
 
@@ -825,6 +835,20 @@ function render(){
     rateRow.appendChild(btn("Reset", function(){ job.priceOverride = ""; saveState(); render(); }, "background:none;border:none;color:#d4a843;font-size:9px;cursor:pointer;"));
   }
   priceSec.appendChild(rateRow);
+
+  var matRow = flexRow([], 8, "font-size:10px;margin-top:8px;padding-top:8px;border-top:1px solid #3a3a3a;");
+  matRow.appendChild(span("Materials $", "#8a8580", "font-size:10px;"));
+  var matInp = numInput(job.materialsCost, function(v){ job.materialsCost = v; }, 70);
+  matInp.placeholder = "0";
+  matRow.appendChild(matInp);
+  if(hasMat){
+    matRow.appendChild(span("−$" + matCost.toFixed(0) + " from total", "#c75050", "font-size:10px;font-weight:600;"));
+    matRow.appendChild(btn("Clear", function(){ job.materialsCost = ""; saveState(); render(); }, "background:none;border:none;color:#d4a843;font-size:9px;cursor:pointer;"));
+  } else {
+    matRow.appendChild(span("Deduct if materials already purchased", "#8a8580", "font-size:9px;font-style:italic;"));
+  }
+  priceSec.appendChild(matRow);
+
   tc.appendChild(priceSec);
   body.appendChild(tc);
 

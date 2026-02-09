@@ -1,4 +1,4 @@
-var CACHE = "paint-calc-v4";
+var CACHE = "paint-calc-v5";
 var FILES = ["/paint-calc/", "/paint-calc/index.html", "/paint-calc/manifest.json", "/paint-calc/icon-192.png", "/paint-calc/icon-512.png"];
 
 self.addEventListener("install", function(e) {
