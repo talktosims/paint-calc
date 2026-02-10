@@ -1,8 +1,8 @@
-var CACHE = "paint-calc-v5";
-var FILES = ["/paint-calc/", "/paint-calc/index.html", "/paint-calc/manifest.json", "/paint-calc/icon-192.png", "/paint-calc/icon-512.png"];
+var CACHE = "paint-calc-v6";
+var SHELL = ["/paint-calc/", "/paint-calc/index.html", "/paint-calc/manifest.json", "/paint-calc/icon-192.png", "/paint-calc/icon-512.png"];
 
 self.addEventListener("install", function(e) {
-  e.waitUntil(caches.open(CACHE).then(function(c) { return c.addAll(FILES); }));
+  e.waitUntil(caches.open(CACHE).then(function(c) { return c.addAll(SHELL); }));
   self.skipWaiting();
 });
 
@@ -14,5 +14,21 @@ self.addEventListener("activate", function(e) {
 });
 
 self.addEventListener("fetch", function(e) {
-  e.respondWith(caches.match(e.request).then(function(r) { return r || fetch(e.request); }));
+  var url = new URL(e.request.url);
+  // Network-first for HTML (always get latest on refresh)
+  if (e.request.mode === "navigate" || url.pathname.endsWith(".html") || url.pathname.endsWith("/")) {
+    e.respondWith(
+      fetch(e.request).then(function(r) {
+        var clone = r.clone();
+        caches.open(CACHE).then(function(c) { c.put(e.request, clone); });
+        return r;
+      }).catch(function() {
+        return caches.match(e.request);
+      })
+    );
+  } else {
+    e.respondWith(
+      caches.match(e.request).then(function(r) { return r || fetch(e.request); })
+    );
+  }
 });
