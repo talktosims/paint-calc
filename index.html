@@ -547,13 +547,16 @@ function exportCSV(job, rate, er){
 
     if(rm.mode === "quick"){
       var q = calcQuickRoom(rm);
+      var qCoats = pi2(rm.quickPrimerCoats) + pi2(rm.quickTopCoats);
       // Walls
       if(q.paintableWall > 0){
-        rows.push([rm.name, "Walls", "wall", 1, q.paintableWall.toFixed(1), "", c1(q.primerGal), c1(q.topGal), rp.sfLabor.toFixed(2)]);
+        var csvWallPrice = q.paintableWall * qCoats * rate;
+        rows.push([rm.name, "Walls", "wall", 1, q.paintableWall.toFixed(1), "", c1(q.primerGal), c1(q.topGal), csvWallPrice.toFixed(2)]);
       }
       // Ceiling
       if(q.ceil > 0){
-        rows.push([rm.name, "Ceiling", "ceiling", 1, q.ceil.toFixed(1), "", "", "", ""]);
+        var csvCeilPrice = q.ceil * qCoats * rate;
+        rows.push([rm.name, "Ceiling", "ceiling", 1, q.ceil.toFixed(1), "", "", "", csvCeilPrice.toFixed(2)]);
       }
       // Baseboard
       if(q.bbFt > 0){
@@ -687,11 +690,14 @@ function printInvoice(job, rate, er){
 
     if(rm.mode === "quick"){
       var q = calcQuickRoom(rm);
+      var qCoats = pi2(rm.quickPrimerCoats) + pi2(rm.quickTopCoats);
       if(q.paintableWall > 0){
-        h += '<tr><td>Walls</td><td>Wall</td><td>1</td><td>' + q.paintableWall.toFixed(1) + '</td><td>—</td><td>' + c1(q.primerGal) + '</td><td>' + c1(q.topGal) + '</td><td style="text-align:right;">—</td></tr>';
+        var wallPrice = q.paintableWall * qCoats * rate;
+        h += '<tr><td>Walls</td><td>Wall</td><td>1</td><td>' + q.paintableWall.toFixed(1) + '</td><td>—</td><td>' + c1(q.primerGal) + '</td><td>' + c1(q.topGal) + '</td><td style="text-align:right;">$' + wallPrice.toFixed(0) + '</td></tr>';
       }
       if(q.ceil > 0){
-        h += '<tr><td>Ceiling</td><td>Ceiling</td><td>1</td><td>' + q.ceil.toFixed(1) + '</td><td>—</td><td>—</td><td>—</td><td style="text-align:right;">—</td></tr>';
+        var ceilPrice = q.ceil * qCoats * rate;
+        h += '<tr><td>Ceiling</td><td>Ceiling</td><td>1</td><td>' + q.ceil.toFixed(1) + '</td><td>—</td><td>—</td><td>—</td><td style="text-align:right;">$' + ceilPrice.toFixed(0) + '</td></tr>';
       }
       if(q.bbFt > 0){
         h += '<tr><td>Baseboard</td><td>Baseboard</td><td>1</td><td>—</td><td>' + q.bbFt.toFixed(1) + '</td><td>' + c1(q.bbPG) + '</td><td>' + c1(q.bbTG) + '</td><td style="text-align:right;">$' + (q.bbFt * er).toFixed(0) + '</td></tr>';
