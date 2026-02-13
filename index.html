@@ -738,21 +738,27 @@ function printInvoice(job, rate, er){
     var rm = job.rooms[i];
     var rp = rps[i];
     h += '<h2>' + rm.name + '</h2>';
-    h += '<table><thead><tr><th>Surface</th><th>Type</th><th>Qty</th><th>Sq Ft</th><th>Linear Ft</th><th>Primer (gal)</th><th>Topcoat (gal)</th><th style="text-align:right;">Price</th></tr></thead><tbody>';
+    h += '<table><thead><tr><th>Surface</th><th>Qty</th><th>Sq Ft</th><th>Linear Ft</th><th>Primer</th><th>Topcoat</th><th>Rate</th><th style="text-align:right;">Price</th></tr></thead><tbody>';
 
     if(rm.mode === "quick"){
       var q = calcQuickRoom(rm);
       var qCoats = pi2(rm.quickPrimerCoats) + pi2(rm.quickTopCoats);
       if(q.paintableWall > 0){
         var wallPrice = q.paintableWall * qCoats * rate;
-        h += '<tr><td>Walls</td><td>Wall</td><td>1</td><td>' + q.paintableWall.toFixed(1) + '</td><td>—</td><td>' + c1(q.primerGal) + '</td><td>' + c1(q.topGal) + '</td><td style="text-align:right;">$' + wallPrice.toFixed(0) + '</td></tr>';
+        h += '<tr><td>Walls</td><td>1</td><td>' + q.paintableWall.toFixed(1) + '</td><td>—</td><td>' + c1(q.primerGal) + 'g</td><td>' + c1(q.topGal) + 'g</td>';
+        h += '<td style="font-size:10px;color:#888;">' + q.paintableWall.toFixed(0) + 'sf × ' + qCoats + ' coats × $' + rate + '</td>';
+        h += '<td style="text-align:right;">$' + wallPrice.toFixed(0) + '</td></tr>';
       }
       if(q.ceil > 0){
         var ceilPrice = q.ceil * qCoats * rate;
-        h += '<tr><td>Ceiling</td><td>Ceiling</td><td>1</td><td>' + q.ceil.toFixed(1) + '</td><td>—</td><td>—</td><td>—</td><td style="text-align:right;">$' + ceilPrice.toFixed(0) + '</td></tr>';
+        h += '<tr><td>Ceiling</td><td>1</td><td>' + q.ceil.toFixed(1) + '</td><td>—</td><td>—</td><td>—</td>';
+        h += '<td style="font-size:10px;color:#888;">' + q.ceil.toFixed(0) + 'sf × ' + qCoats + ' coats × $' + rate + '</td>';
+        h += '<td style="text-align:right;">$' + ceilPrice.toFixed(0) + '</td></tr>';
       }
       if(q.bbFt > 0){
-        h += '<tr><td>Baseboard</td><td>Baseboard</td><td>1</td><td>—</td><td>' + q.bbFt.toFixed(1) + '</td><td>' + c1(q.bbPG) + '</td><td>' + c1(q.bbTG) + '</td><td style="text-align:right;">$' + (q.bbFt * er).toFixed(0) + '</td></tr>';
+        h += '<tr><td>Baseboard</td><td>1</td><td>—</td><td>' + q.bbFt.toFixed(1) + '</td><td>' + c1(q.bbPG) + 'g</td><td>' + c1(q.bbTG) + 'g</td>';
+        h += '<td style="font-size:10px;color:#888;">' + q.bbFt.toFixed(0) + 'lf × $' + er + '/lf</td>';
+        h += '<td style="text-align:right;">$' + (q.bbFt * er).toFixed(0) + '</td></tr>';
       }
       var extras = rm.extras || [];
       for(var j = 0; j < extras.length; j++){
@@ -761,11 +767,19 @@ function printInvoice(job, rate, er){
         var info = findType(ex.type);
         var label = ex.label || (info ? info.l : ex.type);
         var qty = pi2(ex.qty) || 1;
-        h += '<tr><td>' + label + '</td><td>' + (info ? info.l : ex.type) + '</td><td>' + qty + '</td>';
+        var exRate = '';
+        if(sr.price > 0){
+          var perUnit = sr.price / qty;
+          exRate = qty + ' × $' + perUnit.toFixed(0) + (ex.doorSides === 'one' ? ' (1 side)' : '');
+        } else if(sr.lf > 0){
+          exRate = sr.lf.toFixed(0) + 'lf × $' + er + '/lf';
+        }
+        h += '<tr><td>' + label + '</td><td>' + qty + '</td>';
         h += '<td>' + (sr.sqft > 0 ? sr.sqft.toFixed(1) : '—') + '</td>';
         h += '<td>' + (sr.lf > 0 ? sr.lf.toFixed(1) : '—') + '</td>';
-        h += '<td>' + (sr.pg > 0 ? c1(sr.pg) : '—') + '</td>';
-        h += '<td>' + (sr.tg > 0 ? c1(sr.tg) : '—') + '</td>';
+        h += '<td>' + (sr.pg > 0 ? c1(sr.pg) + 'g' : '—') + '</td>';
+        h += '<td>' + (sr.tg > 0 ? c1(sr.tg) + 'g' : '—') + '</td>';
+        h += '<td style="font-size:10px;color:#888;">' + exRate + '</td>';
         h += '<td style="text-align:right;">' + (sr.price > 0 ? '$' + sr.price.toFixed(0) : (sr.lf > 0 ? '$' + (sr.lf * er).toFixed(0) : '—')) + '</td></tr>';
       }
     } else {
@@ -775,20 +789,32 @@ function printInvoice(job, rate, er){
         var info = findType(surf.type);
         var label = surf.label || (info ? info.l : surf.type);
         var qty = pi2(surf.qty) || 1;
-        h += '<tr><td>' + label + '</td><td>' + (info ? info.l : surf.type) + '</td><td>' + qty + '</td>';
+        var surfRate = '';
+        if(sr.price > 0){
+          var perUnit = sr.price / qty;
+          surfRate = qty + ' × $' + perUnit.toFixed(0);
+        } else if(sr.sqft > 0){
+          var sCoats = pi2(surf.primerCoats) + pi2(surf.topCoats);
+          surfRate = sr.sqft.toFixed(0) + 'sf × ' + sCoats + ' coats × $' + rate;
+        } else if(sr.lf > 0){
+          surfRate = sr.lf.toFixed(0) + 'lf × $' + er + '/lf';
+        }
+        h += '<tr><td>' + label + '</td><td>' + qty + '</td>';
         h += '<td>' + (sr.sqft > 0 ? sr.sqft.toFixed(1) : '—') + '</td>';
         h += '<td>' + (sr.lf > 0 ? sr.lf.toFixed(1) : '—') + '</td>';
-        h += '<td>' + (sr.pg > 0 ? c1(sr.pg) : '—') + '</td>';
-        h += '<td>' + (sr.tg > 0 ? c1(sr.tg) : '—') + '</td>';
+        h += '<td>' + (sr.pg > 0 ? c1(sr.pg) + 'g' : '—') + '</td>';
+        h += '<td>' + (sr.tg > 0 ? c1(sr.tg) + 'g' : '—') + '</td>';
+        h += '<td style="font-size:10px;color:#888;">' + surfRate + '</td>';
         h += '<td style="text-align:right;">' + (sr.price > 0 ? '$' + sr.price.toFixed(0) : '—') + '</td></tr>';
       }
     }
 
     // Room subtotal
-    h += '<tr class="room-total"><td colspan="3">Room Total</td>';
+    h += '<tr class="room-total"><td colspan="2">Room Total</td>';
     h += '<td>' + rp.billable.toFixed(0) + ' sf</td>';
     h += '<td>' + rp.lf.toFixed(0) + ' lf</td>';
     h += '<td>' + c1(rp.pg) + '</td><td>' + c1(rp.tg) + '</td>';
+    h += '<td></td>';
     h += '<td style="text-align:right;">$' + rp.total.toFixed(0) + '</td></tr>';
     h += '</tbody></table>';
   }
