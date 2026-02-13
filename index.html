@@ -671,8 +671,16 @@ function printInvoice(job, rate, er){
   h += '.totals-row{display:flex;justify-content:space-between;margin-bottom:4px;font-size:12px;color:#555;}';
   h += '.totals-final{display:flex;justify-content:space-between;font-size:18px;font-weight:700;color:#222;border-top:2px solid #333;padding-top:8px;margin-top:8px;}';
   h += '.rates{font-size:10px;color:#999;margin-top:16px;}';
-  h += '@media print{body{padding:16px;} @page{margin:0.5in;}}';
+  h += '.no-print{display:flex;gap:8px;margin-bottom:16px;}';
+  h += '.no-print button{padding:10px 20px;border-radius:6px;border:none;font-size:13px;font-weight:600;cursor:pointer;font-family:inherit;}';
+  h += '@media print{body{padding:16px;} .no-print{display:none!important;} @page{margin:0.5in;}}';
   h += '</style></head><body>';
+
+  // Action bar (hidden when printing)
+  h += '<div class="no-print">';
+  h += '<button onclick="parent.document.getElementById(\'invoice-overlay\').remove()" style="background:#eee;color:#333;">← Back to App</button>';
+  h += '<button onclick="window.print()" style="background:#b8922e;color:#fff;">Print / Save PDF</button>';
+  h += '</div>';
 
   // Header
   h += '<div class="invoice-header">';
@@ -756,12 +764,19 @@ function printInvoice(job, rate, er){
   h += '<div class="rates">Rate: $' + rate + '/sf/coat · Enamel: $' + er + '/lf · Coverage: ' + COV.sqft + 'sf/g top, ' + COV.primerSqft + 'sf/g primer, ' + COV.linear + 'lf/g trim</div>';
   h += '</body></html>';
 
-  var w = window.open("", "_blank");
-  if(w){
-    w.document.write(h);
-    w.document.close();
-    setTimeout(function(){ w.print(); }, 400);
-  }
+  // Render invoice as overlay in the same page (works on iOS PWA)
+  var overlay = document.createElement("div");
+  overlay.id = "invoice-overlay";
+  overlay.style.cssText = "position:fixed;top:0;left:0;right:0;bottom:0;z-index:9999;background:#fff;overflow-y:auto;-webkit-overflow-scrolling:touch;";
+
+  var iframe = document.createElement("iframe");
+  iframe.style.cssText = "width:100%;height:100%;border:none;";
+  overlay.appendChild(iframe);
+  document.body.appendChild(overlay);
+
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(h);
+  iframe.contentDocument.close();
 }
 
 /* ── Main Render ── */
