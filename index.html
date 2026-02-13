@@ -57,7 +57,7 @@ function makeSurface(o){
     id:uid(), type:"wall", inputMode:"dims",
     widthIn:"", heightIn:"", directSqft:"", linearFt:"",
     subtractWindows:0, subtractDoors:0,
-    primerCoats:1, topCoats:2, label:"", qty:1, doorSides:"both"
+    primerCoats:1, topCoats:2, label:"", qty:1, doorSides:"one"
   };
   if(o) for(var k in o) s[k] = o[k];
   return s;
@@ -425,13 +425,13 @@ function renderSurfCard(surf, types, isExtra){
 
     if(surf.type === "door_face"){
       fr.appendChild(el("div", "width:1px;height:20px;background:#3a3a3a;margin:0 4px;"));
-      fr.appendChild(toggleBtn("Both $100", surf.doorSides === "both", function(){ surf.doorSides = "both"; saveState(); render(); }));
-      fr.appendChild(toggleBtn("One $50", surf.doorSides === "one", function(){ surf.doorSides = "one"; saveState(); render(); }));
+      fr.appendChild(toggleBtn("Single $50", surf.doorSides === "one", function(){ surf.doorSides = "one"; saveState(); render(); }));
+      fr.appendChild(toggleBtn("Double $100", surf.doorSides === "both", function(){ surf.doorSides = "both"; saveState(); render(); }));
     }
     if(surf.type === "door_frame"){
       fr.appendChild(el("div", "width:1px;height:20px;background:#3a3a3a;margin:0 4px;"));
-      fr.appendChild(toggleBtn("Both $200", surf.doorSides === "both", function(){ surf.doorSides = "both"; saveState(); render(); }));
-      fr.appendChild(toggleBtn("One $100", surf.doorSides === "one", function(){ surf.doorSides = "one"; saveState(); render(); }));
+      fr.appendChild(toggleBtn("Single $100", surf.doorSides === "one", function(){ surf.doorSides = "one"; saveState(); render(); }));
+      fr.appendChild(toggleBtn("Double $200", surf.doorSides === "both", function(){ surf.doorSides = "both"; saveState(); render(); }));
     }
     wrapper.appendChild(fr);
 
@@ -776,7 +776,7 @@ function printInvoice(job, rate, er){
         var exRate = '';
         if(sr.price > 0){
           var perUnit = sr.price / qty;
-          exRate = qty + ' × $' + perUnit.toFixed(0) + (ex.doorSides === 'one' ? ' (1 side)' : '');
+          exRate = qty + ' × $' + perUnit.toFixed(0) + (ex.doorSides === 'one' ? ' (single)' : '');
         } else if(sr.lf > 0){
           exRate = sr.lf.toFixed(0) + 'lf × $' + er + '/lf';
         }
@@ -799,7 +799,7 @@ function printInvoice(job, rate, er){
         if(sr.price > 0){
           var perUnit = sr.price / qty;
           surfRate = qty + ' × $' + perUnit.toFixed(0);
-          if(surf.doorSides === 'one') surfRate += ' (1 side)';
+          if(surf.doorSides === 'one') surfRate += ' (single)';
         } else if(sr.sqft > 0){
           var sCoats = pi2(surf.primerCoats) + pi2(surf.topCoats);
           surfRate = sr.sqft.toFixed(0) + 'sf × ' + sCoats + ' coats × $' + rate;
@@ -832,16 +832,16 @@ function printInvoice(job, rate, er){
   if(enTotal > 0) h += '<div class="totals-row"><span>Enamel / Trim labor</span><span>$' + enTotal.toFixed(0) + '</span></div>';
   if(fb.df.q > 0){
     var dfDesc = 'Door faces';
-    if(fb.df.one > 0 && fb.df.both > 0) dfDesc += ' (' + fb.df.both + ' both + ' + fb.df.one + ' single)';
-    else if(fb.df.one > 0) dfDesc += ' (' + fb.df.one + ' single-side)';
-    else dfDesc += ' (' + fb.df.both + ' both-sides)';
+    if(fb.df.one > 0 && fb.df.both > 0) dfDesc += ' (' + fb.df.both + ' double + ' + fb.df.one + ' single)';
+    else if(fb.df.one > 0) dfDesc += ' (' + fb.df.one + ' single)';
+    else dfDesc += ' (' + fb.df.both + ' double)';
     h += '<div class="totals-row"><span>' + dfDesc + '</span><span>$' + fb.df.p + '</span></div>';
   }
   if(fb.dr.q > 0){
     var drDesc = 'Door casings';
-    if(fb.dr.one > 0 && fb.dr.both > 0) drDesc += ' (' + fb.dr.both + ' both + ' + fb.dr.one + ' single)';
-    else if(fb.dr.one > 0) drDesc += ' (' + fb.dr.one + ' single-side)';
-    else drDesc += ' (' + fb.dr.both + ' both-sides)';
+    if(fb.dr.one > 0 && fb.dr.both > 0) drDesc += ' (' + fb.dr.both + ' double + ' + fb.dr.one + ' single)';
+    else if(fb.dr.one > 0) drDesc += ' (' + fb.dr.one + ' single)';
+    else drDesc += ' (' + fb.dr.both + ' double)';
     h += '<div class="totals-row"><span>' + drDesc + '</span><span>$' + fb.dr.p + '</span></div>';
   }
   if(fb.wi.q > 0) h += '<div class="totals-row"><span>Windows (' + fb.wi.q + ')</span><span>$' + fb.wi.p + '</span></div>';
@@ -967,16 +967,16 @@ function render(){
   if(enTotal > 0) breakdown.appendChild(row("Enamel (" + jt.lf.toFixed(0) + "lf×$" + er + ")", "$" + enTotal.toFixed(0)));
   if(fb.df.q > 0){
     var dfL = 'Door faces';
-    if(fb.df.one > 0 && fb.df.both > 0) dfL += ' (' + fb.df.both + ' both + ' + fb.df.one + ' single)';
-    else if(fb.df.one > 0) dfL += ' (' + fb.df.one + ' single-side)';
-    else dfL += ' (' + fb.df.both + ' both-sides)';
+    if(fb.df.one > 0 && fb.df.both > 0) dfL += ' (' + fb.df.both + ' double + ' + fb.df.one + ' single)';
+    else if(fb.df.one > 0) dfL += ' (' + fb.df.one + ' single)';
+    else dfL += ' (' + fb.df.both + ' double)';
     breakdown.appendChild(row(dfL, "$" + fb.df.p));
   }
   if(fb.dr.q > 0){
     var drL = 'Door casings';
-    if(fb.dr.one > 0 && fb.dr.both > 0) drL += ' (' + fb.dr.both + ' both + ' + fb.dr.one + ' single)';
-    else if(fb.dr.one > 0) drL += ' (' + fb.dr.one + ' single-side)';
-    else drL += ' (' + fb.dr.both + ' both-sides)';
+    if(fb.dr.one > 0 && fb.dr.both > 0) drL += ' (' + fb.dr.both + ' double + ' + fb.dr.one + ' single)';
+    else if(fb.dr.one > 0) drL += ' (' + fb.dr.one + ' single)';
+    else drL += ' (' + fb.dr.both + ' double)';
     breakdown.appendChild(row(drL, "$" + fb.dr.p));
   }
   if(fb.wi.q > 0) breakdown.appendChild(row("Windows (" + fb.wi.q + ")", "$" + fb.wi.p));
