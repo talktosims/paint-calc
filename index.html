@@ -36,7 +36,7 @@ var TYPES = [
   {v:"baseboard", l:"Baseboard", u:"linear"},
   {v:"trim", l:"Trim", u:"linear"},
   {v:"door_face", l:"Door (face)", u:"fixed"},
-  {v:"door_frame", l:"Door Frame (enamel)", u:"fixed"},
+  {v:"door_frame", l:"Door Casing", u:"fixed"},
   {v:"window_frame", l:"Window Frame", u:"fixed"}
 ];
 
@@ -233,15 +233,21 @@ function calcRoomPrice(rm, rate, enamelRate){
 }
 
 function calcJobFixed(job){
-  var df = {q:0, p:0};
-  var dr = {q:0, p:0};
+  var df = {q:0, p:0, one:0, both:0};
+  var dr = {q:0, p:0, one:0, both:0};
   var wi = {q:0, p:0};
   function proc(items){
     for(var i = 0; i < items.length; i++){
       var s = items[i];
       var q = pi2(s.qty) || 1;
-      if(s.type === "door_face"){ df.q += q; df.p += (s.doorSides === "both" ? 100 : 50) * q; }
-      else if(s.type === "door_frame"){ dr.q += q; dr.p += (s.doorSides === "both" ? 200 : 100) * q; }
+      if(s.type === "door_face"){
+        df.q += q; df.p += (s.doorSides === "both" ? 100 : 50) * q;
+        if(s.doorSides === "one") df.one += q; else df.both += q;
+      }
+      else if(s.type === "door_frame"){
+        dr.q += q; dr.p += (s.doorSides === "both" ? 200 : 100) * q;
+        if(s.doorSides === "one") dr.one += q; else dr.both += q;
+      }
       else if(s.type === "window_frame"){ wi.q += q; wi.p += 125 * q; }
     }
   }
@@ -793,6 +799,7 @@ function printInvoice(job, rate, er){
         if(sr.price > 0){
           var perUnit = sr.price / qty;
           surfRate = qty + ' × $' + perUnit.toFixed(0);
+          if(surf.doorSides === 'one') surfRate += ' (1 side)';
         } else if(sr.sqft > 0){
           var sCoats = pi2(surf.primerCoats) + pi2(surf.topCoats);
           surfRate = sr.sqft.toFixed(0) + 'sf × ' + sCoats + ' coats × $' + rate;
@@ -823,8 +830,20 @@ function printInvoice(job, rate, er){
   h += '<div class="totals-box">';
   h += '<div class="totals-row"><span>Walls / Ceiling labor</span><span>$' + sfTotal.toFixed(0) + '</span></div>';
   if(enTotal > 0) h += '<div class="totals-row"><span>Enamel / Trim labor</span><span>$' + enTotal.toFixed(0) + '</span></div>';
-  if(fb.df.q > 0) h += '<div class="totals-row"><span>Door faces (' + fb.df.q + ')</span><span>$' + fb.df.p + '</span></div>';
-  if(fb.dr.q > 0) h += '<div class="totals-row"><span>Door frames (' + fb.dr.q + ')</span><span>$' + fb.dr.p + '</span></div>';
+  if(fb.df.q > 0){
+    var dfDesc = 'Door faces';
+    if(fb.df.one > 0 && fb.df.both > 0) dfDesc += ' (' + fb.df.both + ' both + ' + fb.df.one + ' single)';
+    else if(fb.df.one > 0) dfDesc += ' (' + fb.df.one + ' single-side)';
+    else dfDesc += ' (' + fb.df.both + ' both-sides)';
+    h += '<div class="totals-row"><span>' + dfDesc + '</span><span>$' + fb.df.p + '</span></div>';
+  }
+  if(fb.dr.q > 0){
+    var drDesc = 'Door casings';
+    if(fb.dr.one > 0 && fb.dr.both > 0) drDesc += ' (' + fb.dr.both + ' both + ' + fb.dr.one + ' single)';
+    else if(fb.dr.one > 0) drDesc += ' (' + fb.dr.one + ' single-side)';
+    else drDesc += ' (' + fb.dr.both + ' both-sides)';
+    h += '<div class="totals-row"><span>' + drDesc + '</span><span>$' + fb.dr.p + '</span></div>';
+  }
   if(fb.wi.q > 0) h += '<div class="totals-row"><span>Windows (' + fb.wi.q + ')</span><span>$' + fb.wi.p + '</span></div>';
   if(hasOvr) h += '<div class="totals-row"><span>Auto-calc total</span><span style="text-decoration:line-through;">$' + autoTotal.toFixed(0) + '</span></div>';
   if(hasMat) h += '<div class="totals-row"><span>Materials (deducted)</span><span style="color:#c00;">−$' + matCost.toFixed(0) + '</span></div>';
