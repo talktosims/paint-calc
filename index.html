@@ -965,8 +965,20 @@ function render(){
   var breakdown = el("div", "font-size:10px;color:#8a8580;margin-bottom:8px;");
   breakdown.appendChild(row("Walls/Ceiling", "$" + sfTotal.toFixed(0)));
   if(enTotal > 0) breakdown.appendChild(row("Enamel (" + jt.lf.toFixed(0) + "lf×$" + er + ")", "$" + enTotal.toFixed(0)));
-  if(fb.df.q > 0) breakdown.appendChild(row("Door faces (" + fb.df.q + ")", "$" + fb.df.p));
-  if(fb.dr.q > 0) breakdown.appendChild(row("Door frames (" + fb.dr.q + ")", "$" + fb.dr.p));
+  if(fb.df.q > 0){
+    var dfL = 'Door faces';
+    if(fb.df.one > 0 && fb.df.both > 0) dfL += ' (' + fb.df.both + ' both + ' + fb.df.one + ' single)';
+    else if(fb.df.one > 0) dfL += ' (' + fb.df.one + ' single-side)';
+    else dfL += ' (' + fb.df.both + ' both-sides)';
+    breakdown.appendChild(row(dfL, "$" + fb.df.p));
+  }
+  if(fb.dr.q > 0){
+    var drL = 'Door casings';
+    if(fb.dr.one > 0 && fb.dr.both > 0) drL += ' (' + fb.dr.both + ' both + ' + fb.dr.one + ' single)';
+    else if(fb.dr.one > 0) drL += ' (' + fb.dr.one + ' single-side)';
+    else drL += ' (' + fb.dr.both + ' both-sides)';
+    breakdown.appendChild(row(drL, "$" + fb.dr.p));
+  }
   if(fb.wi.q > 0) breakdown.appendChild(row("Windows (" + fb.wi.q + ")", "$" + fb.wi.p));
   if(hasMat) breakdown.appendChild(row("Materials (deducted)", "−$" + matCost.toFixed(0)));
   if(!hasOvr) breakdown.appendChild(span("AUTO", "#5a9e6f"));
